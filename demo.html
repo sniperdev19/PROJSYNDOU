@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Démo - Chat en Temps Réel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        }
+        
+        header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .demo-content {
+            padding: 2rem;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .feature-card {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 15px;
+            border-left: 4px solid #4facfe;
+        }
+        
+        .feature-card h3 {
+            color: #333;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            text-decoration: none;
+            padding: 1rem 2rem;
+            border-radius: 25px;
+            display: inline-block;
+            font-weight: 600;
+            margin: 0.5rem;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
+        }
+        
+        .screenshot {
+            width: 100%;
+            max-width: 600px;
+            margin: 2rem auto;
+            display: block;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .tech-stack {
+            background: #f8f9fa;
+            padding: 2rem;
+            border-radius: 15px;
+            margin: 2rem 0;
+        }
+        
+        .tech-items {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        
+        .tech-item {
+            text-align: center;
+            padding: 1rem;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .instructions {
+            background: #e7f3ff;
+            border: 1px solid #b8daff;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .instructions h3 {
+            color: #004085;
+            margin-bottom: 1rem;
+        }
+        
+        .step {
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+        
+        .step::before {
+            content: counter(step-counter);
+            counter-increment: step-counter;
+            position: absolute;
+            left: 0;
+            top: 0;
+            background: #4facfe;
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        
+        .instructions ol {
+            counter-reset: step-counter;
+            list-style: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>💬 Chat en Temps Réel - Démonstration</h1>
+            <p>Application complète de discussion développée avec HTML, CSS, JavaScript et PHP</p>
+        </header>
+        
+        <div class="demo-content">
+            <div class="instructions">
+                <h3>🚀 Comment tester l'application</h3>
+                <ol>
+                    <li class="step">Ouvrez l'application dans votre navigateur</li>
+                    <li class="step">Entrez un nom d'utilisateur (ex: "Alice")</li>
+                    <li class="step">Cliquez sur "Rejoindre" pour vous connecter</li>
+                    <li class="step">Tapez un message et appuyez sur Entrée</li>
+                    <li class="step">Ouvrez un second onglet pour simuler un autre utilisateur</li>
+                    <li class="step">Testez la conversation en temps réel !</li>
+                </ol>
+            </div>
+            
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3>🎨 Interface Moderne</h3>
+                    <ul>
+                        <li>Design responsive et attractif</li>
+                        <li>Animations fluides</li>
+                        <li>Mode sombre disponible</li>
+                        <li>Compatible mobile</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <h3>⚡ Temps Réel</h3>
+                    <ul>
+                        <li>Messages instantanés</li>
+                        <li>Polling automatique</li>
+                        <li>Notifications visuelles</li>
+                        <li>Indicateur de frappe</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <h3>🔐 Sécurisé</h3>
+                    <ul>
+                        <li>Sessions PHP sécurisées</li>
+                        <li>Échappement HTML/XSS</li>
+                        <li>Validation des données</li>
+                        <li>Requêtes préparées</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <h3>📱 Fonctionnalités</h3>
+                    <ul>
+                        <li>Historique des messages</li>
+                        <li>Timestamps relatifs</li>
+                        <li>Raccourcis clavier</li>
+                        <li>Auto-scroll intelligent</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="tech-stack">
+                <h3 style="text-align: center; margin-bottom: 2rem;">🛠️ Stack Technologique</h3>
+                <div class="tech-items">
+                    <div class="tech-item">
+                        <h4>Frontend</h4>
+                        <p>HTML5, CSS3, JavaScript ES6+</p>
+                    </div>
+                    <div class="tech-item">
+                        <h4>Backend</h4>
+                        <p>PHP 7.4+, Sessions</p>
+                    </div>
+                    <div class="tech-item">
+                        <h4>Base de données</h4>
+                        <p>SQLite 3</p>
+                    </div>
+                    <div class="tech-item">
+                        <h4>API</h4>
+                        <p>REST, AJAX, JSON</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin: 3rem 0;">
+                <a href="install.php" class="btn">📋 Vérifier l'installation</a>
+                <a href="index.html" class="btn">🚀 Lancer l'application</a>
+                <a href="README.md" class="btn">📖 Documentation</a>
+            </div>
+            
+            <div style="background: #f8f9fa; padding: 2rem; border-radius: 15px; text-align: center; margin: 2rem 0;">
+                <h3>💡 Conseils pour la démonstration</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-top: 1rem;">
+                    <div>
+                        <strong>Test multi-utilisateur :</strong><br>
+                        Ouvrez plusieurs onglets avec des noms différents
+                    </div>
+                    <div>
+                        <strong>Raccourcis :</strong><br>
+                        Ctrl+Entrée pour envoyer, "/" pour focus
+                    </div>
+                    <div>
+                        <strong>Messages de test :</strong><br>
+                        Essayez des emojis : 😀 🎉 ❤️ 🚀
+                    </div>
+                </div>
+            </div>
+            
+            <div style="border-top: 1px solid #eee; padding-top: 2rem; margin-top: 2rem; text-align: center; color: #666;">
+                <p>Projet éducatif développé pour PROJSYNDOU</p>
+                <p>Démonstration des technologies web modernes</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

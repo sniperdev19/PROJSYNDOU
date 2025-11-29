@@ -1,0 +1,5 @@
+# Sécurité pour les fichiers audio
+Options -Indexes
+<Files "*.webm">
+    Header set Content-Type "audio/webm"
+</Files>

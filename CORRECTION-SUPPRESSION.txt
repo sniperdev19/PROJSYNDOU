@@ -1,0 +1,100 @@
+🔧 CORRECTION - SUPPRESSION AUTOMATIQUE DES UTILISATEURS
+========================================================
+
+❌ **PROBLÈME IDENTIFIÉ :**
+Quand un nouvel utilisateur rejoint la discussion, tous les autres utilisateurs sont automatiquement supprimés de la base de données, même s'ils sont encore connectés et actifs.
+
+🔍 **CAUSES TROUVÉES :**
+
+1. **Délai de nettoyage trop court** : 2 minutes au lieu de 5
+2. **Nettoyage agressif** lors des nouvelles connexions
+3. **Vérifications incohérentes** entre différentes parties du code
+4. **Suppression non-ciblée** dans certaines opérations
+
+🛠️ **CORRECTIONS APPLIQUÉES :**
+
+### 1. Délais uniformisés (5 minutes au lieu de 2)
+```php
+// AVANT : 2 minutes
+WHERE last_activity < DATE_SUB(NOW(), INTERVAL 2 MINUTE)
+
+// APRÈS : 5 minutes  
+WHERE last_activity < DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+```
+
+### 2. Nettoyage sécurisé avec logs
+```php
+$cleanedCount = $stmt->rowCount();
+if ($cleanedCount > 0) {
+    error_log("🧹 Sessions inactives nettoyées: $cleanedCount");
+}
+```
+
+### 3. Vérifications améliorées avec debug
+```php
+error_log("🔍 Vérification nom '$username': $otherActiveUser autre(s) session(s) active(s)");
+```
+
+### 4. Insertion sécurisée
+```php
+// Utilisation de ON DUPLICATE KEY UPDATE pour éviter les conflits
+INSERT INTO active_users (...) VALUES (...) 
+ON DUPLICATE KEY UPDATE last_activity = NOW()
+```
+
+### 5. Suppression ciblée uniquement
+- Suppression SEULEMENT des sessions spécifiques
+- Plus de suppression globale par nom d'utilisateur
+- Logs détaillés de toutes les suppressions
+
+🧪 **OUTILS DE TEST CRÉÉS :**
+
+1. **`monitor-live.html`** : Monitoring en temps réel
+   - Visualisation des utilisateurs actifs
+   - Statistiques détaillées
+   - Test de connexions simulées
+   - Auto-refresh toutes les 5 secondes
+
+2. **`monitor-users.php`** : Données brutes de la base
+   - Accès direct aux données
+   - Toutes les entrées (même inactives)
+   - Statistiques complètes
+
+### 📋 PROCÉDURE DE TEST :
+
+1. **Ouvrir `monitor-live.html`** pour voir les utilisateurs en temps réel
+
+2. **Test de base** :
+   - Ouvrir 3-4 onglets avec `index.html`
+   - Se connecter avec différents noms dans chaque onglet
+   - Vérifier dans le monitoring que TOUS restent visibles
+
+3. **Test du problème** :
+   - Avoir 2-3 utilisateurs connectés
+   - Connecter un nouveau utilisateur
+   - Vérifier que les anciens ne disparaissent PAS
+
+4. **Test de nettoyage** :
+   - Attendre 5+ minutes sans activité
+   - Connecter un nouvel utilisateur
+   - Vérifier que seuls les vrais inactifs sont supprimés
+
+### ✅ RÉSULTATS ATTENDUS :
+
+- ✅ Les nouveaux utilisateurs ne déconnectent plus les anciens
+- ✅ Nettoyage uniquement après 5 minutes d'inactivité
+- ✅ Logs détaillés pour debugging
+- ✅ Sessions complètement indépendantes
+- ✅ Monitoring en temps réel du système
+
+### 🎯 VÉRIFICATION FINALE :
+
+Utiliser `monitor-live.html` pour tester en temps réel :
+1. Connecter plusieurs utilisateurs
+2. Observer qu'ils restent tous actifs
+3. Connecter un nouveau → les anciens restent
+4. Attendre 5+ minutes → nettoyage automatique des vrais inactifs
+
+La suppression automatique des utilisateurs actifs est maintenant CORRIGÉE !
+
+Date: 29 novembre 2024

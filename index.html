@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat en Temps Réel</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="chat-header">
+            <h1>💬 Chat en Temps Réel <span id="connection-status" class="status-indicator">🟢</span></h1>
+            <div class="user-info">
+                <span id="username-display">Utilisateur: <strong id="current-username"></strong></span>
+                <button id="logout-btn">Déconnexion</button>
+            </div>
+        </header>
+
+        <!-- Formulaire de connexion -->
+        <div id="login-form" class="login-container">
+            <div class="login-box">
+                <h2>Rejoindre le Chat</h2>
+                <form id="username-form">
+                    <input type="text" id="username-input" placeholder="Entrez votre nom d'utilisateur" required maxlength="20">
+                    <button type="submit">Rejoindre</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Interface de chat -->
+        <div id="chat-interface" class="chat-container" style="display: none;">
+            <!-- Zone des messages -->
+            <div class="messages-container">
+                <div id="messages" class="messages"></div>
+                
+                <!-- Indicateur de frappe -->
+                <div id="typing-indicator" class="typing-indicator" style="display: none;">
+                    <span></span> est en train d'écrire...
+                </div>
+            </div>
+
+            <!-- Zone de saisie fixe -->
+            <div class="input-container">
+                <form id="message-form" class="message-form">
+                    <div class="input-group">
+                        <input type="text" id="message-input" placeholder="Tapez votre message..." required maxlength="500">
+                        <button type="button" id="voice-btn" class="voice-btn" title="Enregistrer un message vocal">
+                            <svg id="mic-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 1C10.34 1 9 2.34 9 4V12C9 13.66 10.34 15 12 15C13.66 15 15 13.66 15 12V4C15 2.34 13.66 1 12 1Z" stroke="currentColor" stroke-width="2" fill="currentColor"/>
+                                <path d="M19 10V12C19 16.97 14.97 21 10 21H14C18.97 21 23 16.97 23 12V10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M12 21V23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M8 23H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            <svg id="stop-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: none;">
+                                <rect x="6" y="6" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2" fill="currentColor"/>
+                            </svg>
+                        </button>
+                        <button type="submit">Envoyer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Notification de nouveau message -->
+        <div id="notification" class="notification" style="display: none;">
+            Nouveau message!
+        </div>
+    </div>
+
+    <script src="voice-manager.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

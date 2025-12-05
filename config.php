@@ -19,7 +19,9 @@ return [
         'message_max_length' => 500,
         'max_messages_history' => 50,
         'user_timeout_minutes' => 5,
-        'message_cleanup_hours' => 24
+        'message_cleanup_hours' => 24,
+        'guest_message_limit' => 10, // Limite de messages pour les invités
+        'warning_at_message' => 7 // Avertissement à partir de ce nombre
     ],
     
     // Paramètres de polling

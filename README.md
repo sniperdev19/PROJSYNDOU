@@ -1,6 +1,39 @@
-# Chat Application - Version Multi-Utilisateurs
+# Chat Application - Version Multi-Utilisateurs avec Gestion de Comptes
 
-Une application de discussion en temps réel développée avec HTML, CSS, JavaScript et PHP, **maintenant optimisée pour les connexions multiples simultanées**.
+Une application de discussion en temps réel développée avec HTML, CSS, JavaScript et PHP, **maintenant avec système d'authentification complet et optimisée pour les connexions multiples simultanées**.
+
+## 🔐 NOUVEAU : Système de Création de Compte
+
+Le chat dispose maintenant d'un **système complet de gestion des utilisateurs** avec trois modes de connexion :
+
+### 🎯 Trois modes d'accès :
+1. **Mode Invité** : Connexion rapide sans inscription (⚠️ limité à 10 messages)
+2. **Inscription** : Créez un compte avec email et mot de passe sécurisé
+3. **Connexion** : Connectez-vous avec votre compte existant
+
+### 🚀 Installation rapide du module :
+1. Démarrez WAMP/MySQL
+2. Accédez à : `http://localhost/PROJET ECOLE/PROJSYNDOU2/setup-users.php`
+3. Cliquez sur le bouton pour créer la table
+4. C'est prêt ! 🎉
+
+📖 **Documentation complète** : Consultez [AUTH-README.md](AUTH-README.md) pour tous les détails
+
+## 📊 NOUVEAU : Limitation des Messages Invités
+
+Pour encourager la création de comptes, les **invités sont limités à 10 messages** :
+
+### 🎯 Fonctionnement :
+- **Messages 1-6** : Utilisation libre sans avertissement
+- **Messages 7-9** : Avertissement avec compteur de messages restants
+- **Message 10+** : Blocage avec invitation à créer un compte
+
+### ✨ Avantages de créer un compte :
+- ✅ **Messages illimités** - Discutez sans restriction
+- ✅ **Historique sauvegardé** - Retrouvez vos conversations
+- ✅ **Connexion permanente** - Restez connecté entre les sessions
+
+📖 **Documentation détaillée** : [GUEST-LIMITS.md](GUEST-LIMITS.md)
 
 ## 🆕 Nouvelles Fonctionnalités - Connexions Multiples
 

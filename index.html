@@ -19,11 +19,47 @@
         <!-- Formulaire de connexion -->
         <div id="login-form" class="login-container">
             <div class="login-box">
-                <h2>Rejoindre le Chat</h2>
-                <form id="username-form">
-                    <input type="text" id="username-input" placeholder="Entrez votre nom d'utilisateur" required maxlength="20">
-                    <button type="submit">Rejoindre</button>
-                </form>
+                <h2 id="auth-title">Connexion au Chat</h2>
+                
+                <!-- Mode sans compte (invité) -->
+                <div id="guest-mode" style="display: block;">
+                    <form id="username-form">
+                        <input type="text" id="username-input" placeholder="Entrez votre nom d'utilisateur" required maxlength="20">
+                        <button type="submit">Rejoindre en tant qu'invité</button>
+                    </form>
+                    <div class="auth-switch">
+                        <p>Vous avez déjà un compte ? <a href="#" id="show-login">Se connecter</a></p>
+                        <p>Pas encore de compte ? <a href="#" id="show-register">S'inscrire</a></p>
+                    </div>
+                </div>
+                
+                <!-- Formulaire de connexion avec compte -->
+                <div id="login-mode" style="display: none;">
+                    <form id="login-account-form">
+                        <input type="text" id="login-identifier" placeholder="Nom d'utilisateur ou email" required>
+                        <input type="password" id="login-password" placeholder="Mot de passe" required>
+                        <button type="submit">Se connecter</button>
+                    </form>
+                    <div class="auth-switch">
+                        <p><a href="#" id="back-to-guest-from-login">Continuer en tant qu'invité</a></p>
+                        <p>Pas encore de compte ? <a href="#" id="show-register-from-login">S'inscrire</a></p>
+                    </div>
+                </div>
+                
+                <!-- Formulaire d'inscription -->
+                <div id="register-mode" style="display: none;">
+                    <form id="register-form">
+                        <input type="text" id="register-username" placeholder="Nom d'utilisateur" required maxlength="20">
+                        <input type="email" id="register-email" placeholder="Adresse email" required>
+                        <input type="password" id="register-password" placeholder="Mot de passe (min. 6 caractères)" required minlength="6">
+                        <input type="password" id="register-confirm-password" placeholder="Confirmer le mot de passe" required minlength="6">
+                        <button type="submit">Créer mon compte</button>
+                    </form>
+                    <div class="auth-switch">
+                        <p><a href="#" id="back-to-guest-from-register">Continuer en tant qu'invité</a></p>
+                        <p>Déjà un compte ? <a href="#" id="show-login-from-register">Se connecter</a></p>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -44,6 +80,15 @@
                 <form id="message-form" class="message-form">
                     <div class="input-group">
                         <input type="text" id="message-input" placeholder="Tapez votre message..." required maxlength="500">
+                        
+                        <!-- Bouton pour les médias (photos/vidéos) -->
+                        <input type="file" id="media-input" accept="image/*,video/*" style="display: none;">
+                        <button type="button" id="media-btn" class="media-btn" title="Envoyer une photo ou vidéo">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M4 16L8.586 11.414C9.367 10.633 10.633 10.633 11.414 11.414L16 16M14 14L15.586 12.414C16.367 11.633 17.633 11.633 18.414 12.414L20 14M14 8H14.01M6 20H18C19.105 20 20 19.105 20 18V6C20 4.895 19.105 4 18 4H6C4.895 4 4 4.895 4 6V18C4 19.105 4.895 20 6 20Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        
                         <button type="button" id="voice-btn" class="voice-btn" title="Enregistrer un message vocal">
                             <svg id="mic-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M12 1C10.34 1 9 2.34 9 4V12C9 13.66 10.34 15 12 15C13.66 15 15 13.66 15 12V4C15 2.34 13.66 1 12 1Z" stroke="currentColor" stroke-width="2" fill="currentColor"/>
@@ -57,6 +102,16 @@
                         </button>
                         <button type="submit">Envoyer</button>
                     </div>
+                    
+                    <!-- Prévisualisation du média sélectionné -->
+                    <div id="media-preview" class="media-preview" style="display: none;">
+                        <div class="preview-content">
+                            <img id="preview-image" style="display: none;">
+                            <video id="preview-video" controls style="display: none;"></video>
+                            <button type="button" id="cancel-media" class="cancel-media">✕</button>
+                        </div>
+                        <span id="media-filename" class="media-filename"></span>
+                    </div>
                 </form>
             </div>
         </div>
@@ -65,9 +120,42 @@
         <div id="notification" class="notification" style="display: none;">
             Nouveau message!
         </div>
+        
+        <!-- Modale pour afficher les images en grand -->
+        <div id="media-modal" class="media-modal">
+            <button class="media-modal-close" onclick="window.closeMediaModal()">✕</button>
+            <img id="modal-image" src="" alt="Image en grand">
+        </div>
     </div>
 
     <script src="voice-manager.js"></script>
+    <script src="media-manager.js"></script>
     <script src="script.js"></script>
+    
+    <script>
+        // Fonction pour ouvrir la modale d'image
+        window.openMediaModal = function(imageUrl) {
+            const modal = document.getElementById('media-modal');
+            const modalImage = document.getElementById('modal-image');
+            modalImage.src = imageUrl;
+            modal.classList.add('active');
+        };
+        
+        // Fonction pour fermer la modale
+        window.closeMediaModal = function() {
+            const modal = document.getElementById('media-modal');
+            modal.classList.remove('active');
+        };
+        
+        // Fermer la modale en cliquant dessus
+        document.addEventListener('DOMContentLoaded', () => {
+            const modal = document.getElementById('media-modal');
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    window.closeMediaModal();
+                }
+            });
+        });
+    </script>
 </body>
 </html>

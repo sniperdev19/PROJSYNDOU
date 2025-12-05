@@ -10,27 +10,20 @@ ini_set('session.cookie_httponly', 1);
 ini_set('session.gc_maxlifetime', 86400); // 24 heures
 ini_set('session.save_handler', 'files');
 
-// Gérer les sessions multiples avec IDs vraiment uniques
+// Gérer les sessions avec IDs valides PHP (seulement A-Z, a-z, 0-9, tirets)
 $sessionStarted = false;
 
 try {
     if (isset($_POST['client_id']) && !empty($_POST['client_id'])) {
         $providedId = $_POST['client_id'];
-        // Valider l'ID fourni
-        if (preg_match('/^[a-zA-Z0-9_]+$/', $providedId) && strlen($providedId) > 10) {
-            session_id($providedId);
-            error_log("🔑 Utilisation client_id fourni: " . $providedId);
-        }
-    } else {
-        // Générer un ID de session unique s'il n'existe pas
-        if (!isset($_COOKIE['client_id']) || empty($_COOKIE['client_id'])) {
-            $clientId = 'chat_' . bin2hex(random_bytes(8)) . '_' . time() . '_' . mt_rand(1000, 9999);
-            setcookie('client_id', $clientId, time() + 86400, '/', '', false, true); // 24 heures, secure
-            session_id($clientId);
-            error_log("🆕 Nouveau client_id généré: " . $clientId);
-        } else {
-            session_id($_COOKIE['client_id']);
-            error_log("🍪 Utilisation cookie client_id: " . $_COOKIE['client_id']);
+        // Nettoyer l'ID pour qu'il soit valide (remplacer underscores par tirets, garder que alphanum)
+        $cleanId = preg_replace('/[^a-zA-Z0-9-]/', '', str_replace('_', '-', $providedId));
+        // Limiter à 48 caractères (limite PHP)
+        $cleanId = substr($cleanId, 0, 48);
+        
+        if (strlen($cleanId) >= 10) {
+            session_id($cleanId);
+            error_log("🔑 Utilisation client_id fourni (nettoyé): " . $cleanId);
         }
     }
 
@@ -38,11 +31,20 @@ try {
     $sessionStarted = true;
     error_log("✅ Session démarrée avec ID: " . session_id());
     
+    // Log de l'état de la session pour debug
+    if (isset($_SESSION['user_id']) && !empty($_SESSION['user_id'])) {
+        error_log("🔐 Session contient user_id: {$_SESSION['user_id']} pour username: " . ($_SESSION['username'] ?? 'non défini'));
+    } else {
+        error_log("👤 Session sans user_id (invité ou pas encore connecté)");
+    }
+    
 } catch (Exception $e) {
     error_log("❌ Erreur démarrage session: " . $e->getMessage());
     // Fallback avec session par défaut
-    session_start();
-    $sessionStarted = true;
+    if (!$sessionStarted) {
+        session_start();
+        $sessionStarted = true;
+    }
 }
 
 header('Content-Type: application/json');
@@ -175,7 +177,62 @@ switch ($action) {
             }
         }
         
-        sendResponse(true, ['username' => $username, 'session_id' => $currentSessionId, 'session_start' => $sessionStart]);
+        // Préparer les données de réponse
+        $responseData = [
+            'username' => $username, 
+            'session_id' => $currentSessionId, 
+            'session_start' => $sessionStart
+        ];
+        
+        // Vérifier en DB si l'utilisateur est un abonné (existe dans la table users)
+        $isGuest = true; // Par défaut invité
+        $userId = null;
+        
+        if (!empty($username)) {
+            try {
+                $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? AND is_active = 1");
+                $stmt->execute([$username]);
+                $user = $stmt->fetch();
+                
+                if ($user) {
+                    // Utilisateur trouvé dans la table users = ABONNÉ
+                    $isGuest = false;
+                    $userId = $user['id'];
+                    $_SESSION['user_id'] = $userId; // Synchroniser la session
+                    error_log("📊 check_session - ABONNÉ en DB: $username (user_id: $userId)");
+                } else {
+                    // Pas dans la table users = INVITÉ
+                    error_log("📊 check_session - INVITÉ (pas dans users): $username");
+                }
+            } catch (PDOException $e) {
+                error_log("Erreur vérification utilisateur en DB: " . $e->getMessage());
+            }
+        }
+        
+        if ($username && $isGuest) {
+            try {
+                $stmt = $pdo->prepare("SELECT COUNT(*) FROM messages WHERE username = ? AND timestamp > DATE_SUB(NOW(), INTERVAL 24 HOUR)");
+                $stmt->execute([$username]);
+                $messageCount = $stmt->fetchColumn();
+                $guestLimit = $config['limits']['guest_message_limit'];
+                $warningAt = $config['limits']['warning_at_message'];
+                
+                $responseData['is_guest'] = true;
+                $responseData['message_count'] = $messageCount;
+                $responseData['remaining'] = max(0, $guestLimit - $messageCount);
+                $responseData['limit'] = $guestLimit;
+                $responseData['show_warning'] = $messageCount >= $warningAt;
+            } catch (PDOException $e) {
+                error_log("Erreur comptage messages invité: " . $e->getMessage());
+            }
+        } else {
+            $responseData['is_guest'] = false;
+            if (isset($_SESSION['user_id'])) {
+                $responseData['user_id'] = $_SESSION['user_id'];
+            }
+        }
+        
+        sendResponse(true, $responseData);
         break;
         
     case 'login':
@@ -365,6 +422,31 @@ switch ($action) {
         $username = $_SESSION['username'] ?? '';
         $postedUsername = $_POST['username'] ?? '';
         
+        // Vérifier en DB si l'utilisateur est un abonné (existe dans la table users)
+        $isGuest = true; // Par défaut invité
+        $userId = null;
+        
+        if (!empty($username)) {
+            try {
+                $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? AND is_active = 1");
+                $stmt->execute([$username]);
+                $user = $stmt->fetch();
+                
+                if ($user) {
+                    // Utilisateur trouvé dans la table users = ABONNÉ
+                    $isGuest = false;
+                    $userId = $user['id'];
+                    $_SESSION['user_id'] = $userId; // Synchroniser la session
+                    error_log("👤 ABONNÉ détecté en DB: $username (user_id: $userId)");
+                } else {
+                    // Pas dans la table users = INVITÉ
+                    error_log("👥 INVITÉ détecté (pas dans users): $username");
+                }
+            } catch (PDOException $e) {
+                error_log("Erreur vérification utilisateur en DB: " . $e->getMessage());
+            }
+        }
+        
         error_log("🔍 send_message - Session ID: '$currentSessionId', Session Username: '$username', Posted Username: '$postedUsername'");
         
         // Utiliser le username de la session ou du POST si disponible
@@ -394,6 +476,27 @@ switch ($action) {
             error_log("❌ Échec d'authentification pour send_message - Username vide après vérifications");
             sendResponse(false, null, 'Session expirée. Veuillez vous reconnecter.');
             return;
+        }
+        
+        // Vérifier la limite de messages pour les invités
+        if ($isGuest) {
+            $guestLimit = $config['limits']['guest_message_limit'];
+            
+            try {
+                // Compter les messages de cet invité dans cette session
+                $stmt = $pdo->prepare("SELECT COUNT(*) FROM messages WHERE username = ? AND timestamp > DATE_SUB(NOW(), INTERVAL 24 HOUR)");
+                $stmt->execute([$username]);
+                $messageCount = $stmt->fetchColumn();
+                
+                if ($messageCount >= $guestLimit) {
+                    error_log("🚫 Limite atteinte pour invité '$username': $messageCount/$guestLimit messages");
+                    sendResponse(false, ['limit_reached' => true, 'message_count' => $messageCount, 'limit' => $guestLimit], 
+                        "Limite de $guestLimit messages atteinte. Créez un compte pour continuer à discuter !");
+                    return;
+                }
+            } catch (PDOException $e) {
+                error_log("Erreur vérification limite invité: " . $e->getMessage());
+            }
         }
         
         // Vérifier que l'utilisateur existe encore dans la base
@@ -485,7 +588,27 @@ switch ($action) {
                 $stmt = $pdo->prepare("UPDATE active_users SET last_activity = NOW() WHERE username = ? AND session_id = ?");
                 $stmt->execute([$username, session_id()]);
                 
-                sendResponse(true, ['id' => $pdo->lastInsertId()], 'Message envoyé');
+                // Si c'est un invité, calculer les messages restants
+                $responseData = ['id' => $pdo->lastInsertId()];
+                if ($isGuest) {
+                    $stmt = $pdo->prepare("SELECT COUNT(*) FROM messages WHERE username = ? AND timestamp > DATE_SUB(NOW(), INTERVAL 24 HOUR)");
+                    $stmt->execute([$username]);
+                    $messageCount = $stmt->fetchColumn();
+                    $guestLimit = $config['limits']['guest_message_limit'];
+                    $warningAt = $config['limits']['warning_at_message'];
+                    
+                    $responseData['is_guest'] = true;
+                    $responseData['message_count'] = $messageCount;
+                    $responseData['remaining'] = $guestLimit - $messageCount;
+                    $responseData['limit'] = $guestLimit;
+                    $responseData['show_warning'] = $messageCount >= $warningAt;
+                } else {
+                    // Utilisateur avec compte - pas de limite
+                    $responseData['is_guest'] = false;
+                    error_log("✅ Message envoyé par utilisateur avec compte: $username (user_id: {$_SESSION['user_id']})");
+                }
+                
+                sendResponse(true, $responseData, 'Message envoyé');
                 return;
             } catch (PDOException $e) {
                 error_log("Erreur lors de l'envoi du message : " . $e->getMessage());
@@ -512,11 +635,11 @@ switch ($action) {
         try {
             if ($last_id > 0) {
                 // Récupérer seulement les nouveaux messages
-                $stmt = $pdo->prepare("SELECT id, username, message, is_audio, audio_path, audio_duration, timestamp FROM messages WHERE id > ? ORDER BY id ASC");
+                $stmt = $pdo->prepare("SELECT id, username, message, is_audio, audio_path, audio_duration, media_type, media_path, timestamp FROM messages WHERE id > ? ORDER BY id ASC");
                 $stmt->execute([$last_id]);
             } else {
                 // Récupérer les derniers messages
-                $stmt = $pdo->prepare("SELECT id, username, message, is_audio, audio_path, audio_duration, timestamp FROM messages ORDER BY id DESC LIMIT " . intval($limit));
+                $stmt = $pdo->prepare("SELECT id, username, message, is_audio, audio_path, audio_duration, media_type, media_path, timestamp FROM messages ORDER BY id DESC LIMIT " . intval($limit));
                 $stmt->execute();
                 $messages = $stmt->fetchAll();
                 $messages = array_reverse($messages); // Inverser pour avoir l'ordre chronologique
@@ -653,6 +776,224 @@ switch ($action) {
         }
         break;
         
+    case 'send_media':
+        // Vérification d'authentification
+        $currentSessionId = session_id();
+        $username = $_SESSION['username'] ?? '';
+        
+        if (empty($username)) {
+            error_log("❌ Échec d'authentification pour send_media - Username vide");
+            sendResponse(false, null, 'Session expirée. Veuillez vous reconnecter.');
+            return;
+        }
+        
+        // Vérifier en DB si l'utilisateur est un abonné
+        $isGuest = true;
+        $userId = null;
+        
+        if (!empty($username)) {
+            try {
+                $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? AND is_active = 1");
+                $stmt->execute([$username]);
+                $user = $stmt->fetch();
+                
+                if ($user) {
+                    $isGuest = false;
+                    $userId = $user['id'];
+                    $_SESSION['user_id'] = $userId;
+                    error_log("👤 ABONNÉ envoi média: $username (user_id: $userId)");
+                } else {
+                    error_log("👥 INVITÉ envoi média: $username");
+                }
+            } catch (PDOException $e) {
+                error_log("Erreur vérification utilisateur en DB: " . $e->getMessage());
+            }
+        }
+        
+        // Vérifier la limite pour les invités
+        if ($isGuest) {
+            $guestLimit = $config['limits']['guest_message_limit'];
+            
+            try {
+                $stmt = $pdo->prepare("SELECT COUNT(*) FROM messages WHERE username = ? AND timestamp > DATE_SUB(NOW(), INTERVAL 24 HOUR)");
+                $stmt->execute([$username]);
+                $messageCount = $stmt->fetchColumn();
+                
+                if ($messageCount >= $guestLimit) {
+                    error_log("🚫 Limite atteinte pour invité '$username': $messageCount/$guestLimit messages");
+                    sendResponse(false, ['limit_reached' => true, 'message_count' => $messageCount, 'limit' => $guestLimit], 
+                        "Limite de $guestLimit messages atteinte. Créez un compte pour continuer !");
+                    return;
+                }
+            } catch (PDOException $e) {
+                error_log("Erreur vérification limite invité: " . $e->getMessage());
+            }
+        }
+        
+        // Vérifier qu'un fichier a été uploadé
+        if (!isset($_FILES['media']) || $_FILES['media']['error'] !== UPLOAD_ERR_OK) {
+            $error_msg = 'Erreur lors de l\'upload du fichier';
+            
+            if (isset($_FILES['media']['error'])) {
+                $errorCode = $_FILES['media']['error'];
+                switch ($errorCode) {
+                    case UPLOAD_ERR_INI_SIZE:
+                        $error_msg = 'Le fichier dépasse la limite définie dans php.ini (upload_max_filesize: ' . ini_get('upload_max_filesize') . '). Vidéos max 20MB.';
+                        break;
+                    case UPLOAD_ERR_FORM_SIZE:
+                        $error_msg = 'Le fichier est trop volumineux (dépassement de MAX_FILE_SIZE).';
+                        break;
+                    case UPLOAD_ERR_PARTIAL:
+                        $error_msg = 'Le fichier n\'a été que partiellement uploadé. Réessayez.';
+                        break;
+                    case UPLOAD_ERR_NO_FILE:
+                        $error_msg = 'Aucun fichier n\'a été uploadé.';
+                        break;
+                    case UPLOAD_ERR_NO_TMP_DIR:
+                        $error_msg = 'Dossier temporaire manquant sur le serveur.';
+                        break;
+                    case UPLOAD_ERR_CANT_WRITE:
+                        $error_msg = 'Impossible d\'écrire le fichier sur le disque.';
+                        break;
+                    case UPLOAD_ERR_EXTENSION:
+                        $error_msg = 'Upload bloqué par une extension PHP.';
+                        break;
+                    default:
+                        $error_msg .= ' (code d\'erreur: ' . $errorCode . ')';
+                }
+            }
+            
+            error_log("❌ Erreur upload média: $error_msg");
+            sendResponse(false, null, $error_msg);
+            return;
+        }
+        
+        $mediaFile = $_FILES['media'];
+        $caption = sanitizeInput($_POST['caption'] ?? '');
+        
+        // Déterminer le type de média
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeType = finfo_file($finfo, $mediaFile['tmp_name']);
+        finfo_close($finfo);
+        
+        $isImage = strpos($mimeType, 'image/') === 0;
+        $isVideo = strpos($mimeType, 'video/') === 0;
+        
+        if (!$isImage && !$isVideo) {
+            sendResponse(false, null, 'Type de fichier non supporté. Utilisez des images ou vidéos.');
+            return;
+        }
+        
+        // Vérifier la taille du fichier
+        $maxImageSize = 5 * 1024 * 1024; // 5MB
+        $maxVideoSize = 20 * 1024 * 1024; // 20MB
+        
+        if ($isImage && $mediaFile['size'] > $maxImageSize) {
+            sendResponse(false, null, 'L\'image ne doit pas dépasser 5MB');
+            return;
+        }
+        
+        if ($isVideo && $mediaFile['size'] > $maxVideoSize) {
+            sendResponse(false, null, 'La vidéo ne doit pas dépasser 20MB');
+            return;
+        }
+        
+        // Créer les dossiers si nécessaire
+        $uploadDir = $isImage ? 'uploads/images/' : 'uploads/videos/';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+        
+        // Générer un nom de fichier unique
+        $extension = pathinfo($mediaFile['name'], PATHINFO_EXTENSION);
+        $fileName = uniqid() . '_' . time() . '.' . $extension;
+        $filePath = $uploadDir . $fileName;
+        
+        // Déplacer le fichier uploadé
+        if (move_uploaded_file($mediaFile['tmp_name'], $filePath)) {
+            try {
+                // Insérer dans la base de données
+                $mediaType = $isImage ? 'image' : 'video';
+                $message = $caption ? $caption : '[' . ucfirst($mediaType) . ']';
+                
+                $stmt = $pdo->prepare("INSERT INTO messages (username, message, media_type, media_path, timestamp) VALUES (?, ?, ?, ?, NOW())");
+                $stmt->execute([$username, $message, $mediaType, $fileName]);
+                
+                // Mettre à jour l'activité
+                $stmt = $pdo->prepare("UPDATE active_users SET last_activity = NOW() WHERE username = ? AND session_id = ?");
+                $stmt->execute([$username, $currentSessionId]);
+                
+                // Préparer la réponse
+                $responseData = ['id' => $pdo->lastInsertId()];
+                
+                // Compteurs pour les invités
+                if ($isGuest) {
+                    $stmt = $pdo->prepare("SELECT COUNT(*) FROM messages WHERE username = ? AND timestamp > DATE_SUB(NOW(), INTERVAL 24 HOUR)");
+                    $stmt->execute([$username]);
+                    $messageCount = $stmt->fetchColumn();
+                    $guestLimit = $config['limits']['guest_message_limit'];
+                    $warningAt = $config['limits']['warning_at_message'];
+                    
+                    $responseData['is_guest'] = true;
+                    $responseData['message_count'] = $messageCount;
+                    $responseData['remaining'] = $guestLimit - $messageCount;
+                    $responseData['limit'] = $guestLimit;
+                    $responseData['show_warning'] = $messageCount >= $warningAt;
+                } else {
+                    $responseData['is_guest'] = false;
+                }
+                
+                error_log("✅ Média envoyé: $mediaType - $fileName par $username");
+                sendResponse(true, $responseData, 'Média envoyé avec succès');
+                return;
+                
+            } catch (PDOException $e) {
+                error_log("Erreur lors de l'enregistrement du média : " . $e->getMessage());
+                // Supprimer le fichier en cas d'erreur
+                if (file_exists($filePath)) {
+                    unlink($filePath);
+                }
+                sendResponse(false, null, 'Erreur lors de l\'enregistrement');
+                return;
+            }
+        } else {
+            sendResponse(false, null, 'Erreur lors de la sauvegarde du fichier');
+            return;
+        }
+        break;
+        
+    case 'get_media':
+        $type = $_GET['type'] ?? '';
+        $filename = $_GET['file'] ?? '';
+        error_log("Demande fichier média: " . $type . "/" . $filename);
+        
+        if (empty($filename) || !preg_match('/^[a-zA-Z0-9_]+\.[a-zA-Z0-9]+$/', $filename)) {
+            error_log("Nom de fichier invalide: " . $filename);
+            http_response_code(404);
+            exit('Fichier non trouvé');
+        }
+        
+        $uploadDir = $type === 'image' ? 'uploads/images/' : 'uploads/videos/';
+        $filePath = $uploadDir . $filename;
+        
+        if (!file_exists($filePath)) {
+            error_log("Fichier n'existe pas: " . $filePath);
+            http_response_code(404);
+            exit('Fichier non trouvé');
+        }
+        
+        // Déterminer le type MIME
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeType = finfo_file($finfo, $filePath);
+        finfo_close($finfo);
+        
+        header('Content-Type: ' . $mimeType);
+        header('Content-Length: ' . filesize($filePath));
+        header('Accept-Ranges: bytes');
+        readfile($filePath);
+        exit;
+        break;
+    
     case 'get_audio':
         $filename = $_GET['file'] ?? '';
         error_log("Demande fichier audio: " . $filename);
@@ -682,6 +1023,129 @@ switch ($action) {
         header('Accept-Ranges: bytes');
         readfile($filePath);
         exit;
+        break;
+        
+    case 'register':
+        // Récupérer les données d'inscription
+        $username = sanitizeInput($_POST['username'] ?? '');
+        $email = sanitizeInput($_POST['email'] ?? '');
+        $password = $_POST['password'] ?? '';
+        $confirmPassword = $_POST['confirm_password'] ?? '';
+        
+        // Validation des données
+        if (!isValidUsername($username)) {
+            sendResponse(false, null, 'Nom d\'utilisateur invalide (1-20 caractères, lettres, chiffres, _ - et espaces autorisés)');
+        }
+        
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            sendResponse(false, null, 'Adresse email invalide');
+        }
+        
+        if (strlen($password) < 6) {
+            sendResponse(false, null, 'Le mot de passe doit contenir au moins 6 caractères');
+        }
+        
+        if ($password !== $confirmPassword) {
+            sendResponse(false, null, 'Les mots de passe ne correspondent pas');
+        }
+        
+        try {
+            // Vérifier si le nom d'utilisateur existe déjà
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = ?");
+            $stmt->execute([$username]);
+            if ($stmt->fetchColumn() > 0) {
+                sendResponse(false, null, 'Ce nom d\'utilisateur est déjà utilisé');
+            }
+            
+            // Vérifier si l'email existe déjà
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE email = ?");
+            $stmt->execute([$email]);
+            if ($stmt->fetchColumn() > 0) {
+                sendResponse(false, null, 'Cette adresse email est déjà utilisée');
+            }
+            
+            // Créer le compte
+            $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+            $stmt = $pdo->prepare("INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)");
+            $stmt->execute([$username, $email, $passwordHash]);
+            
+            error_log("✅ Nouveau compte créé: $username ($email)");
+            sendResponse(true, ['username' => $username], 'Compte créé avec succès! Vous pouvez maintenant vous connecter.');
+            
+        } catch (PDOException $e) {
+            error_log("Erreur lors de la création du compte : " . $e->getMessage());
+            sendResponse(false, null, 'Erreur lors de la création du compte');
+        }
+        break;
+        
+    case 'login_account':
+        // Connexion avec compte utilisateur
+        $identifier = sanitizeInput($_POST['identifier'] ?? ''); // username ou email
+        $password = $_POST['password'] ?? '';
+        
+        if (empty($identifier) || empty($password)) {
+            sendResponse(false, null, 'Veuillez remplir tous les champs');
+        }
+        
+        try {
+            // Rechercher l'utilisateur par username ou email
+            $stmt = $pdo->prepare("SELECT id, username, email, password_hash, is_active FROM users WHERE username = ? OR email = ?");
+            $stmt->execute([$identifier, $identifier]);
+            $user = $stmt->fetch();
+            
+            if (!$user) {
+                sendResponse(false, null, 'Identifiant ou mot de passe incorrect');
+            }
+            
+            // Vérifier si le compte est actif
+            if (!$user['is_active']) {
+                sendResponse(false, null, 'Ce compte a été désactivé');
+            }
+            
+            // Vérifier le mot de passe
+            if (!password_verify($password, $user['password_hash'])) {
+                sendResponse(false, null, 'Identifiant ou mot de passe incorrect');
+            }
+            
+            // Nettoyer les sessions inactives
+            $stmt = $pdo->prepare("DELETE FROM active_users WHERE last_activity < DATE_SUB(NOW(), INTERVAL 30 SECOND)");
+            $stmt->execute();
+            
+            // Créer la session
+            $username = $user['username'];
+            $_SESSION['username'] = $username;
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['session_start'] = time();
+            
+            // NE PAS faire session_write_close/session_start ici car ça réinitialise la session
+            // Les données de session sont automatiquement sauvegardées à la fin du script
+            error_log("🔐 Session créée avec user_id: {$user['id']} pour $username");
+            
+            // Mettre à jour la dernière connexion
+            $stmt = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
+            $stmt->execute([$user['id']]);
+            
+            // Ajouter à la liste des utilisateurs actifs
+            $currentSessionId = session_id();
+            $stmt = $pdo->prepare("DELETE FROM active_users WHERE session_id = ?");
+            $stmt->execute([$currentSessionId]);
+            
+            $stmt = $pdo->prepare("INSERT INTO active_users (username, last_activity, session_id) VALUES (?, NOW(), ?)");
+            $stmt->execute([$username, $currentSessionId]);
+            
+            error_log("✅ Connexion réussie avec compte: $username (ID: {$user['id']})");
+            sendResponse(true, [
+                'username' => $username,
+                'session_id' => $currentSessionId,
+                'session_start' => $_SESSION['session_start'],
+                'is_guest' => false,
+                'user_id' => $user['id']
+            ], 'Connexion réussie!');
+            
+        } catch (PDOException $e) {
+            error_log("Erreur lors de la connexion : " . $e->getMessage());
+            sendResponse(false, null, 'Erreur lors de la connexion');
+        }
         break;
         
     default:

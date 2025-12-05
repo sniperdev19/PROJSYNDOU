@@ -1,0 +1,58 @@
+╔════════════════════════════════════════════════════════════════╗
+║                                                                ║
+║        🎥 PROBLÈME D'UPLOAD DE VIDÉOS - SOLUTION RAPIDE        ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+❌ PROBLÈME : "Erreur lors de l'upload du fichier" pour les vidéos
+
+✅ SOLUTION EN 1 CLIC :
+
+   1. Ouvrez dans votre navigateur :
+      
+      👉 http://localhost/PROJET%20ECOLE/PROJSYNDOU2/diagnostic-video-upload.php
+      
+   2. Suivez les instructions affichées
+   
+   3. Testez l'upload directement sur cette page
+
+════════════════════════════════════════════════════════════════
+
+📋 SOLUTIONS ALTERNATIVES :
+
+   A. Script PowerShell Automatique
+      - Ouvrez PowerShell en Admin
+      - Exécutez : .\configure-php-for-videos.ps1
+      
+   B. Manuel (WAMP)
+      - Icône WAMP → PHP → php.ini
+      - Modifiez : upload_max_filesize = 25M
+      - Modifiez : post_max_size = 30M
+      - Redémarrez WAMP
+
+════════════════════════════════════════════════════════════════
+
+🔧 MODIFICATIONS APPORTÉES :
+
+   ✅ api.php - Messages d'erreur détaillés
+   ✅ .htaccess - Limites PHP augmentées
+   ✅ diagnostic-video-upload.php - Page de diagnostic
+   ✅ configure-php-for-videos.ps1 - Script auto
+   ✅ Documentation complète
+
+════════════════════════════════════════════════════════════════
+
+📊 LIMITES :
+
+   Images : 5 MB max
+   Vidéos : 20 MB max
+   Audio  : 10 MB max
+
+════════════════════════════════════════════════════════════════
+
+📚 DOCUMENTATION COMPLÈTE :
+
+   CORRECTION-VIDEO-UPLOAD.md     → Résumé rapide
+   GUIDE-RESOLUTION-VIDEO.md      → Guide détaillé complet
+
+════════════════════════════════════════════════════════════════

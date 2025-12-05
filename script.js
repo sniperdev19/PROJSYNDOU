@@ -6,6 +6,10 @@ class ChatApp {
         this.pollInterval = null;
         this.isTyping = false;
         this.isPageVisible = true;
+        this.isGuest = false;
+        this.messageCount = 0;
+        this.messageLimit = 10;
+        this.messagesRemaining = 10;
         
         // Générer un ID client unique pour cette instance
         this.clientId = this.getOrCreateClientId();
@@ -16,11 +20,13 @@ class ChatApp {
     }
     
     getOrCreateClientId() {
-        // Générer un ID vraiment unique pour chaque instance/fenêtre
-        const instanceId = 'chat_' + Date.now() + '_' + Math.random().toString(36).substr(2, 12) + '_' + performance.now().toString().replace('.', '');
+        // Générer un ID valide pour PHP sessions (seulement A-Z, a-z, 0-9, tirets)
+        // Pas d'underscores ni de points !
+        const timestamp = Date.now().toString();
+        const random = Math.random().toString(36).substring(2, 15);
+        const instanceId = 'chat-' + timestamp + '-' + random;
         
-        // Stocker temporairement dans sessionStorage plutôt que localStorage 
-        // pour que chaque onglet/fenêtre ait son propre ID
+        // Stocker dans sessionStorage pour que chaque onglet ait son propre ID
         let clientId = sessionStorage.getItem('chat_instance_id');
         if (!clientId) {
             clientId = instanceId;
@@ -36,10 +42,22 @@ class ChatApp {
     }
 
     bindEvents() {
-        // Formulaire de connexion
+        // Formulaire de connexion invité
         document.getElementById('username-form').addEventListener('submit', (e) => {
             e.preventDefault();
             this.login();
+        });
+        
+        // Formulaire de connexion avec compte
+        document.getElementById('login-account-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.loginWithAccount();
+        });
+        
+        // Formulaire d'inscription
+        document.getElementById('register-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.register();
         });
 
         // Formulaire de message
@@ -66,6 +84,37 @@ class ChatApp {
                 this.startPolling();
             }
         });
+        
+        // Navigation entre les modes d'authentification
+        document.getElementById('show-login').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showAuthMode('login');
+        });
+        
+        document.getElementById('show-register').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showAuthMode('register');
+        });
+        
+        document.getElementById('show-register-from-login').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showAuthMode('register');
+        });
+        
+        document.getElementById('show-login-from-register').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showAuthMode('login');
+        });
+        
+        document.getElementById('back-to-guest-from-login').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showAuthMode('guest');
+        });
+        
+        document.getElementById('back-to-guest-from-register').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showAuthMode('guest');
+        });
     }
 
     async checkSession() {
@@ -84,6 +133,25 @@ class ChatApp {
             if (data.success && data.data && data.data.username) {
                 this.username = data.data.username.trim(); // Nettoyer le nom
                 console.log('Session restored for user:', `"${this.username}"`);
+                
+                // Gérer les données invité
+                if (data.data.is_guest) {
+                    this.isGuest = true;
+                    this.messageCount = data.data.message_count || 0;
+                    this.messageLimit = data.data.limit || 10;
+                    this.messagesRemaining = data.data.remaining || 0;
+                    console.log(`Invité - Messages: ${this.messageCount}/${this.messageLimit}, Restants: ${this.messagesRemaining}`);
+                    if (data.data.show_warning) {
+                        this.showGuestWarning();
+                    }
+                } else {
+                    // Utilisateur avec compte - réinitialiser les variables invité
+                    this.isGuest = false;
+                    this.messageCount = 0;
+                    this.messagesRemaining = 0;
+                    this.messageLimit = 0;
+                    console.log('Utilisateur avec compte - Pas de limite de messages');
+                }
                 
                 // Mettre à jour l'affichage du nom
                 const usernameDisplay = document.getElementById('current-username');
@@ -158,6 +226,13 @@ class ChatApp {
                 console.log('Connexion réussie, nom d\'utilisateur:', `"${this.username}"`);
                 console.log('Session ID:', data.data?.session_id);
                 
+                // Marquer comme invité (connexion sans compte)
+                this.isGuest = true;
+                this.messageCount = 0;
+                this.messageLimit = 10;
+                this.messagesRemaining = 10;
+                console.log('Connexion en tant qu\'invité - Limite: 10 messages');
+                
                 // Mettre à jour l'affichage
                 const usernameDisplay = document.getElementById('current-username');
                 if (usernameDisplay) {
@@ -188,6 +263,142 @@ class ChatApp {
         }
     }
 
+    async register() {
+        const username = document.getElementById('register-username').value.trim();
+        const email = document.getElementById('register-email').value.trim();
+        const password = document.getElementById('register-password').value;
+        const confirmPassword = document.getElementById('register-confirm-password').value;
+
+        if (!username || !email || !password || !confirmPassword) {
+            this.showNotification('Veuillez remplir tous les champs', 'error');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            this.showNotification('Les mots de passe ne correspondent pas', 'error');
+            return;
+        }
+
+        if (password.length < 6) {
+            this.showNotification('Le mot de passe doit contenir au moins 6 caractères', 'error');
+            return;
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('username', username);
+            formData.append('email', email);
+            formData.append('password', password);
+            formData.append('confirm_password', confirmPassword);
+
+            const response = await fetch('api.php?action=register', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.showNotification(data.message || 'Compte créé avec succès!', 'success');
+                // Remplir automatiquement le formulaire de connexion
+                document.getElementById('login-identifier').value = username;
+                // Passer au mode connexion
+                setTimeout(() => {
+                    this.showAuthMode('login');
+                }, 1500);
+            } else {
+                this.showNotification(data.message || 'Erreur lors de la création du compte', 'error');
+            }
+        } catch (error) {
+            console.error('Erreur lors de l\'inscription:', error);
+            this.showNotification('Erreur lors de l\'inscription', 'error');
+        }
+    }
+
+    async loginWithAccount() {
+        const identifier = document.getElementById('login-identifier').value.trim();
+        const password = document.getElementById('login-password').value;
+
+        if (!identifier || !password) {
+            this.showNotification('Veuillez remplir tous les champs', 'error');
+            return;
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('client_id', this.clientId);
+            formData.append('identifier', identifier);
+            formData.append('password', password);
+
+            const response = await fetch('api.php?action=login_account', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.username = data.data.username;
+                console.log('Connexion avec compte réussie:', this.username);
+                console.log('Données reçues du serveur:', data.data);
+                console.log('is_guest reçu:', data.data.is_guest);
+                console.log('user_id reçu:', data.data.user_id);
+                
+                // Réinitialiser les variables invité (utilisateur avec compte)
+                this.isGuest = false;
+                this.messageCount = 0;
+                this.messagesRemaining = 0;
+                this.messageLimit = 0;
+                
+                // Mettre à jour l'affichage
+                const usernameDisplay = document.getElementById('current-username');
+                if (usernameDisplay) {
+                    usernameDisplay.textContent = this.username;
+                }
+                
+                this.showChat();
+                this.loadMessages();
+                this.loadActiveUsers();
+                this.startPolling();
+                
+                this.showNotification(data.message || 'Connexion réussie!', 'success');
+            } else {
+                this.showNotification(data.message || 'Erreur de connexion', 'error');
+            }
+        } catch (error) {
+            console.error('Erreur lors de la connexion avec compte:', error);
+            this.showNotification('Erreur de connexion', 'error');
+        }
+    }
+
+    showAuthMode(mode) {
+        const guestMode = document.getElementById('guest-mode');
+        const loginMode = document.getElementById('login-mode');
+        const registerMode = document.getElementById('register-mode');
+        const authTitle = document.getElementById('auth-title');
+
+        // Cacher tous les modes
+        guestMode.style.display = 'none';
+        loginMode.style.display = 'none';
+        registerMode.style.display = 'none';
+
+        // Afficher le mode demandé
+        switch(mode) {
+            case 'guest':
+                guestMode.style.display = 'block';
+                authTitle.textContent = 'Rejoindre le Chat';
+                break;
+            case 'login':
+                loginMode.style.display = 'block';
+                authTitle.textContent = 'Connexion au Chat';
+                break;
+            case 'register':
+                registerMode.style.display = 'block';
+                authTitle.textContent = 'Créer un Compte';
+                break;
+        }
+    }
+
     async logout() {
         // Éviter les déconnexions multiples
         if (!this.username) {
@@ -208,6 +419,11 @@ class ChatApp {
             this.clearMessages();
             this.username = '';
             this.lastMessageId = 0;
+            // Réinitialiser les variables invité
+            this.isGuest = false;
+            this.messageCount = 0;
+            this.messagesRemaining = 0;
+            this.messageLimit = 10;
             this.showLogin();
             this.showNotification('Déconnexion réussie', 'success');
         } catch (error) {
@@ -251,9 +467,31 @@ class ChatApp {
             if (data.success) {
                 messageInput.value = '';
                 console.log('Message envoyé avec succès, ID:', data.data?.id);
+                
+                // Mettre à jour les compteurs pour les invités
+                if (data.data?.is_guest) {
+                    this.isGuest = true;
+                    this.messageCount = data.data.message_count;
+                    this.messagesRemaining = data.data.remaining;
+                    this.messageLimit = data.data.limit;
+                    
+                    console.log(`Invité - Messages: ${this.messageCount}/${this.messageLimit}, Restants: ${this.messagesRemaining}`);
+                    
+                    // Afficher l'avertissement si nécessaire
+                    if (data.data.show_warning) {
+                        this.showGuestWarning();
+                    }
+                }
+                
                 // Recharger immédiatement les messages pour voir le nouveau message
                 this.loadMessages();
             } else {
+                // Vérifier si la limite est atteinte
+                if (data.data && data.data.limit_reached) {
+                    this.handleGuestLimitReached();
+                    return;
+                }
+                
                 console.error('Échec envoi message - Détails complets:', {
                     success: data.success,
                     message: data.message,
@@ -343,6 +581,12 @@ class ChatApp {
     }
 
     displayMessage(message) {
+        // Vérifier que l'utilisateur est connecté avant d'afficher
+        if (!this.username) {
+            console.warn('displayMessage appelé sans utilisateur connecté, message ignoré');
+            return;
+        }
+        
         const messagesContainer = document.getElementById('messages');
         const messageElement = document.createElement('div');
         
@@ -351,13 +595,6 @@ class ChatApp {
         const messageUser = normalizeUsername(message.username);
         const currentUser = normalizeUsername(this.username);
         const isOwnMessage = messageUser === currentUser;
-        
-        // Vérifier que this.username est défini
-        if (!this.username) {
-            console.warn('this.username n\'est pas défini ! Vérification de session...');
-            this.checkSession();
-            return; // Ne pas afficher le message si pas de session
-        }
         
         // Debug détaillé pour tous les messages
         console.log('Message debug:', {
@@ -405,6 +642,28 @@ class ChatApp {
                     </div>
                 </div>
             `;
+        } else if (message.media_type && message.media_path) {
+            // Message avec média (photo ou vidéo)
+            const mediaUrl = `api.php?action=get_media&type=${message.media_type}&file=${message.media_path}`;
+            
+            if (message.media_type === 'image') {
+                contentHtml = `
+                    <div class="media-container">
+                        <img src="${mediaUrl}" alt="Image partagée" onclick="window.openMediaModal('${mediaUrl}')" loading="lazy">
+                        ${message.message && message.message !== '[Image]' ? `<div class="media-caption">${this.escapeHtml(message.message)}</div>` : ''}
+                    </div>
+                `;
+            } else if (message.media_type === 'video') {
+                contentHtml = `
+                    <div class="media-container">
+                        <video controls preload="metadata">
+                            <source src="${mediaUrl}" type="video/mp4">
+                            Votre navigateur ne supporte pas la lecture de vidéos.
+                        </video>
+                        ${message.message && message.message !== '[Video]' ? `<div class="media-caption">${this.escapeHtml(message.message)}</div>` : ''}
+                    </div>
+                `;
+            }
         } else {
             // Message texte normal
             contentHtml = `<div class="message-content">${this.escapeHtml(message.message)}</div>`;
@@ -703,6 +962,104 @@ class ChatApp {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    showGuestWarning() {
+        if (!this.isGuest || this.messagesRemaining <= 0) return;
+        
+        const warningHtml = `
+            <div class="guest-warning" id="guest-warning">
+                <div class="warning-content">
+                    <span class="warning-icon">⚠️</span>
+                    <span class="warning-text">
+                        <strong>Attention !</strong> Il vous reste <strong>${this.messagesRemaining}</strong> message${this.messagesRemaining > 1 ? 's' : ''} en tant qu'invité.
+                        <a href="#" id="create-account-link" style="color: #3182ce; text-decoration: underline; margin-left: 5px;">Créer un compte</a> pour continuer à discuter.
+                    </span>
+                    <button class="warning-close" onclick="this.parentElement.parentElement.remove()">×</button>
+                </div>
+            </div>
+        `;
+        
+        // Vérifier si l'avertissement existe déjà
+        const existingWarning = document.getElementById('guest-warning');
+        if (existingWarning) {
+            existingWarning.remove();
+        }
+        
+        // Ajouter l'avertissement dans l'interface de chat
+        const chatContainer = document.querySelector('.chat-container');
+        if (chatContainer) {
+            chatContainer.insertAdjacentHTML('afterbegin', warningHtml);
+            
+            // Ajouter l'événement pour le lien
+            const createAccountLink = document.getElementById('create-account-link');
+            if (createAccountLink) {
+                createAccountLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.logout();
+                    setTimeout(() => {
+                        this.showAuthMode('register');
+                    }, 500);
+                });
+            }
+        }
+    }
+
+    handleGuestLimitReached() {
+        // Bloquer l'interface de saisie
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.querySelector('#message-form button[type="submit"]');
+        const voiceBtn = document.getElementById('voice-btn');
+        
+        if (messageInput) {
+            messageInput.disabled = true;
+            messageInput.placeholder = 'Limite atteinte - Créez un compte pour continuer';
+        }
+        if (sendButton) sendButton.disabled = true;
+        if (voiceBtn) voiceBtn.disabled = true;
+        
+        // Afficher une notification modale
+        const modalHtml = `
+            <div class="guest-limit-modal" id="guest-limit-modal">
+                <div class="modal-overlay"></div>
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>🚫 Limite de messages atteinte</h2>
+                    </div>
+                    <div class="modal-body">
+                        <p>Vous avez atteint la limite de <strong>${this.messageLimit} messages</strong> en tant qu'invité.</p>
+                        <p><strong>Créez un compte gratuit</strong> pour continuer à discuter sans limites !</p>
+                        <div class="benefits">
+                            <div class="benefit-item">✅ Messages illimités</div>
+                            <div class="benefit-item">✅ Historique sauvegardé</div>
+                            <div class="benefit-item">✅ Connexion permanente</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-primary" id="modal-create-account">Créer un compte</button>
+                        <button class="btn-secondary" id="modal-disconnect">Se déconnecter</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Gestionnaires d'événements
+        document.getElementById('modal-create-account').addEventListener('click', () => {
+            document.getElementById('guest-limit-modal').remove();
+            this.logout();
+            setTimeout(() => {
+                this.showAuthMode('register');
+            }, 500);
+        });
+        
+        document.getElementById('modal-disconnect').addEventListener('click', () => {
+            document.getElementById('guest-limit-modal').remove();
+            this.logout();
+        });
+        
+        this.showNotification('Limite de messages atteinte. Créez un compte pour continuer !', 'error');
     }
 }
 

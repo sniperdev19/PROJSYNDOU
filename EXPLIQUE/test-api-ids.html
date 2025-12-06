@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Diagnostic IDs API</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        button { padding: 10px 20px; margin: 10px 0; cursor: pointer; background: #667eea; color: white; border: none; border-radius: 4px; }
+        pre { background: #f0f0f0; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        .error { color: #d73a49; }
+        .success { color: #28a745; }
+        .warning { color: #ff9800; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background: #667eea; color: white; }
+        tr:nth-child(even) { background: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Diagnostic API - Vérification des IDs de messages</h1>
+        <p>Cette page teste si l'API retourne correctement les IDs uniques.</p>
+        
+        <div>
+            <label>
+                Username: 
+                <input type="text" id="username" value="test-user" style="padding: 5px; width: 200px;">
+            </label>
+        </div>
+        
+        <button onclick="testGetMessages()">📤 Récupérer les messages (last_id=0)</button>
+        <button onclick="testSendMessage()">✍️ Envoyer un message de test</button>
+        <button onclick="testDuplicates()">🔁 Vérifier les doublons</button>
+        <button onclick="clearLog()">🗑️ Effacer le log</button>
+        
+        <h2>Résultats:</h2>
+        <div id="results" style="background: #f9f9f9; padding: 10px; border-radius: 4px; min-height: 100px;"></div>
+        
+        <h2>Messages reçus:</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>Message</th>
+                    <th>Timestamp</th>
+                </tr>
+            </thead>
+            <tbody id="messages-table">
+                <tr><td colspan="4" style="text-align: center; color: #999;">Aucun message</td></tr>
+            </tbody>
+        </table>
+        
+        <h2>Analyse des doublons:</h2>
+        <div id="duplicate-analysis" style="background: #f9f9f9; padding: 10px; border-radius: 4px;"></div>
+    </div>
+
+    <script>
+        let allMessages = [];
+        let lastId = 0;
+
+        function log(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : type === 'warning' ? 'warning' : 'info';
+            resultsDiv.innerHTML += `<div class="${className}"><strong>[${timestamp}]</strong> ${message}</div>`;
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('messages-table').innerHTML = '<tr><td colspan="4" style="text-align: center; color: #999;">Aucun message</td></tr>';
+            allMessages = [];
+            lastId = 0;
+        }
+
+        async function testGetMessages() {
+            log('📥 Récupération des messages...');
+            try {
+                const response = await fetch(`api.php?action=get_messages&last_id=0`);
+                const data = await response.json();
+                
+                if (data.success && data.data.messages) {
+                    const messages = data.data.messages;
+                    log(`✅ ${messages.length} messages reçus`, 'success');
+                    
+                    // Vérifier les IDs
+                    const ids = messages.map(m => m.id);
+                    const uniqueIds = new Set(ids);
+                    
+                    log(`IDs reçus: [${ids.join(', ')}]`);
+                    log(`IDs uniques: ${uniqueIds.size}/${ids.length}`, uniqueIds.size === ids.length ? 'success' : 'warning');
+                    
+                    // Chercher les doublons
+                    const idCounts = {};
+                    ids.forEach(id => {
+                        idCounts[id] = (idCounts[id] || 0) + 1;
+                    });
+                    
+                    const duplicates = Object.entries(idCounts).filter(([id, count]) => count > 1);
+                    if (duplicates.length > 0) {
+                        log(`⚠️ DOUBLONS DÉTECTÉS: ${JSON.stringify(duplicates)}`, 'warning');
+                    }
+                    
+                    // Remplir le tableau
+                    displayMessages(messages);
+                    allMessages = messages;
+                } else {
+                    log('❌ Pas de messages reçus', 'error');
+                }
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSendMessage() {
+            const username = document.getElementById('username').value;
+            if (!username) {
+                log('❌ Entrez un username', 'error');
+                return;
+            }
+            
+            log(`📤 Envoi d'un message de test...`);
+            try {
+                const formData = new FormData();
+                formData.append('username', username);
+                formData.append('message', `Message de test à ${new Date().toLocaleTimeString()}`);
+                
+                const response = await fetch('api.php?action=send_message', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    log(`✅ Message envoyé avec ID: ${data.data?.id}`, 'success');
+                    lastId = data.data?.id || 0;
+                    
+                    // Attendre un peu puis recharger les messages
+                    setTimeout(() => {
+                        log('⏳ Rechargement des messages après envoi...');
+                        testGetMessages();
+                    }, 500);
+                } else {
+                    log(`❌ Erreur: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        function displayMessages(messages) {
+            const tbody = document.getElementById('messages-table');
+            tbody.innerHTML = '';
+            
+            messages.forEach(msg => {
+                const row = `
+                    <tr>
+                        <td><strong>${msg.id}</strong></td>
+                        <td>${msg.username}</td>
+                        <td>${msg.message}</td>
+                        <td>${msg.timestamp}</td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
+        async function testDuplicates() {
+            if (allMessages.length === 0) {
+                log('❌ Aucun message à analyser. Cliquez d\'abord sur "Récupérer les messages"', 'error');
+                return;
+            }
+            
+            log('🔍 Analyse des doublons...');
+            
+            const duplicateAnalysis = document.getElementById('duplicate-analysis');
+            duplicateAnalysis.innerHTML = '';
+            
+            // Grouper par ID
+            const byId = {};
+            allMessages.forEach(msg => {
+                if (!byId[msg.id]) {
+                    byId[msg.id] = [];
+                }
+                byId[msg.id].push(msg);
+            });
+            
+            // Chercher les IDs avec plusieurs messages
+            let hasDuplicates = false;
+            Object.entries(byId).forEach(([id, msgs]) => {
+                if (msgs.length > 1) {
+                    hasDuplicates = true;
+                    duplicateAnalysis.innerHTML += `
+                        <div style="background: #ffe0e0; padding: 10px; margin: 5px 0; border-radius: 4px;">
+                            <strong>🚨 ID ${id} apparaît ${msgs.length} fois:</strong>
+                            <ul>
+                                ${msgs.map(m => `<li>${m.username}: "${m.message}"</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+            });
+            
+            if (!hasDuplicates) {
+                duplicateAnalysis.innerHTML = '<div class="success">✅ Aucun doublon détecté dans les IDs</div>';
+                log('✅ Aucun doublon par ID', 'success');
+            } else {
+                log('⚠️ Doublons détectés!', 'warning');
+            }
+            
+            // Vérifier aussi les doublons par (username + message)
+            const byContent = {};
+            allMessages.forEach(msg => {
+                const key = `${msg.username}|${msg.message}`;
+                if (!byContent[key]) {
+                    byContent[key] = [];
+                }
+                byContent[key].push(msg);
+            });
+            
+            const contentDuplicates = Object.entries(byContent).filter(([key, msgs]) => msgs.length > 1);
+            if (contentDuplicates.length > 0) {
+                log(`⚠️ ${contentDuplicates.length} contenu(s) en double détecté(s)!`, 'warning');
+                duplicateAnalysis.innerHTML += `
+                    <div style="background: #fff3cd; padding: 10px; margin: 5px 0; border-radius: 4px;">
+                        <strong>⚠️ Doublons par contenu (username + message):</strong>
+                        ${contentDuplicates.map(([key, msgs]) => `
+                            <div style="margin: 5px 0; padding: 5px; background: white; border-radius: 3px;">
+                                "${key}" - IDs: ${msgs.map(m => m.id).join(', ')}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+        }
+
+        // Tester automatiquement au chargement
+        window.addEventListener('load', () => {
+            log('✅ Page chargée. Cliquez sur "Récupérer les messages" pour commencer.');
+        });
+    </script>
+</body>
+</html>

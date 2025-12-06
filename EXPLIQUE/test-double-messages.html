@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test - Envoi Double</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f7fa;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 15px;
+        }
+        .info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #2196f3;
+            margin: 20px 0;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #28a745;
+            margin: 20px 0;
+        }
+        .test-list {
+            list-style: none;
+            padding: 0;
+        }
+        .test-list li {
+            padding: 10px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .test-list li:before {
+            content: "✅ ";
+            color: #28a745;
+        }
+        code {
+            background: #2d3748;
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Correction - Messages Envoyés en Double</h1>
+        
+        <div class="success">
+            <h3>✅ Problème Résolu !</h3>
+            <p>Le problème d'envoi de messages en double a été corrigé.</p>
+        </div>
+        
+        <div class="info">
+            <h3>🔍 Cause du Problème</h3>
+            <p>Il y avait <strong>deux gestionnaires d'événements</strong> attachés au formulaire d'envoi de message :</p>
+            <ol>
+                <li>Un dans <code>script.js</code></li>
+                <li>Un autre dans <code>media-manager.js</code></li>
+            </ol>
+            <p>Résultat : chaque envoi déclenchait deux fois la fonction, créant des messages en double.</p>
+        </div>
+        
+        <h2>🔧 Corrections Apportées</h2>
+        
+        <ul class="test-list">
+            <li><strong>script.js</strong> - Changé <code>addEventListener</code> en <code>onsubmit</code></li>
+            <li><strong>media-manager.js</strong> - Changé <code>addEventListener</code> en <code>onsubmit</code></li>
+            <li>L'utilisation de <code>onsubmit</code> remplace le gestionnaire au lieu d'en ajouter un nouveau</li>
+            <li>Le gestionnaire de <code>media-manager.js</code> écrase celui de <code>script.js</code></li>
+        </ul>
+        
+        <div class="info">
+            <h3>💡 Comment ça Fonctionne Maintenant</h3>
+            <p><strong>1. Au chargement initial :</strong></p>
+            <ul>
+                <li><code>script.js</code> définit <code>messageForm.onsubmit</code> pour envoyer des messages texte</li>
+            </ul>
+            <p><strong>2. Quand media-manager.js se charge (100ms après) :</strong></p>
+            <ul>
+                <li>Il <strong>remplace</strong> le gestionnaire par le sien</li>
+                <li>Son gestionnaire vérifie s'il y a un média sélectionné</li>
+                <li>Si oui → envoie le média</li>
+                <li>Si non → appelle <code>chatApp.sendMessage()</code> (texte normal)</li>
+            </ul>
+        </div>
+        
+        <div class="success">
+            <h3>🔧 Correction Supplémentaire Appliquée</h3>
+            <p><strong>Verrou sur loadMessages() :</strong></p>
+            <ul>
+                <li>Ajout de <code>isLoadingMessages</code> pour empêcher les appels simultanés</li>
+                <li>Si <code>loadMessages()</code> est déjà en cours, les autres appels sont ignorés</li>
+                <li>Le verrou est libéré dans un bloc <code>finally</code></li>
+            </ul>
+            <p>Cela empêche le polling et l'envoi manuel d'appeler <code>loadMessages()</code> en même temps.</p>
+        </div>
+        
+        <h2>✅ Tests à Effectuer</h2>
+        
+        <ol style="line-height: 2;">
+            <li><strong>Message texte simple</strong>
+                <ul>
+                    <li>Tapez un message et cliquez "Envoyer"</li>
+                    <li>Vérifiez qu'il n'apparaît qu'<strong>une seule fois</strong></li>
+                </ul>
+            </li>
+            
+            <li><strong>Message avec image</strong>
+                <ul>
+                    <li>Cliquez sur 📷, sélectionnez une image</li>
+                    <li>Ajoutez une légende (optionnel)</li>
+                    <li>Envoyez et vérifiez qu'il n'y a qu'<strong>un seul message</strong></li>
+                </ul>
+            </li>
+            
+            <li><strong>Message avec vidéo</strong>
+                <ul>
+                    <li>Même procédure avec une vidéo</li>
+                    <li>Vérifiez l'affichage unique</li>
+                </ul>
+            </li>
+            
+            <li><strong>Message vocal</strong>
+                <ul>
+                    <li>Utilisez le bouton micro 🎤</li>
+                    <li>Vérifiez qu'il n'y a pas de doublon</li>
+                </ul>
+            </li>
+            
+            <li><strong>Envoi rapide</strong>
+                <ul>
+                    <li>Envoyez plusieurs messages rapidement</li>
+                    <li>Aucun ne doit être dupliqué</li>
+                </ul>
+            </li>
+        </ol>
+        
+        <div class="success">
+            <h3>🎉 Résultat Attendu</h3>
+            <p>Chaque message ne devrait apparaître qu'<strong>une seule fois</strong> dans la conversation, quel que soit son type (texte, image, vidéo, audio).</p>
+        </div>
+        
+        <h2>🔍 Vérification dans la Console</h2>
+        <p>Ouvrez la console du navigateur (F12) et cherchez :</p>
+        <ul>
+            <li>✅ <code>Message envoyé avec succès</code> - devrait n'apparaître qu'<strong>une fois</strong> par envoi</li>
+            <li>✅ <code>📷 Media Manager initialisé</code> - confirme que le gestionnaire de médias est actif</li>
+            <li>❌ Pas de messages dupliqués dans les logs</li>
+        </ul>
+        
+        <div class="info">
+            <h3>📚 Fichiers Modifiés</h3>
+            <ul>
+                <li><code>script.js</code> - Ligne ~64-70 (gestionnaire de formulaire)</li>
+                <li><code>media-manager.js</code> - Ligne ~34-46 (gestionnaire de formulaire)</li>
+            </ul>
+        </div>
+        
+        <hr style="margin: 30px 0;">
+        
+        <p style="text-align: center; color: #666;">
+            <strong>Test complété ?</strong> Retournez au chat et vérifiez que tout fonctionne correctement !<br>
+            <a href="index.html" style="color: #667eea; text-decoration: none;">← Retour au Chat</a>
+        </p>
+    </div>
+</body>
+</html>

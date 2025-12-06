@@ -30,19 +30,37 @@ class MediaManager {
             this.cancelMediaSelection();
         });
 
-        // Modifier l'envoi de message pour inclure les médias
+        // Gérer l'envoi de message pour inclure les médias
         const messageForm = document.getElementById('message-form');
-        const originalSubmit = messageForm.onsubmit;
         
-        messageForm.addEventListener('submit', (e) => {
+        // Variable anti-rebond pour éviter les soumissions multiples
+        let isSubmitting = false;
+        
+        // Utiliser onsubmit au lieu d'addEventListener pour éviter les doublons
+        // Cela écrase le gestionnaire précédent au lieu d'en ajouter un nouveau
+        messageForm.onsubmit = (e) => {
             e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            
+            // Anti-rebond: bloquer si déjà en cours de soumission
+            if (isSubmitting) {
+                return false;
+            }
+            isSubmitting = true;
+            
             if (this.selectedFile) {
-                this.sendMediaMessage();
+                this.sendMediaMessage().finally(() => {
+                    isSubmitting = false;
+                });
             } else {
                 // Appeler la méthode d'envoi de message texte normale
-                this.chatApp.sendMessage();
+                this.chatApp.sendMessage().finally(() => {
+                    isSubmitting = false;
+                });
             }
-        });
+            return false; // Empêcher tout comportement par défaut
+        };
     }
 
     handleFileSelect(file) {

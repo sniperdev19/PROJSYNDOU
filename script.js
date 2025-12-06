@@ -10,6 +10,8 @@ class ChatApp {
         this.messageCount = 0;
         this.messageLimit = 10;
         this.messagesRemaining = 10;
+        this.isLoadingMessages = false; // Verrou pour éviter les appels simultanés
+        this.isSendingMessage = false; // Verrou pour éviter les envois en double
         
         // Générer un ID client unique pour cette instance
         this.clientId = this.getOrCreateClientId();
@@ -60,11 +62,13 @@ class ChatApp {
             this.register();
         });
 
-        // Formulaire de message
-        document.getElementById('message-form').addEventListener('submit', (e) => {
+        // Formulaire de message - Sera remplacé par media-manager.js s'il est chargé
+        const messageForm = document.getElementById('message-form');
+        messageForm.onsubmit = (e) => {
             e.preventDefault();
             this.sendMessage();
-        });
+            return false;
+        };
 
         // Déconnexion
         document.getElementById('logout-btn').addEventListener('click', () => {
@@ -432,10 +436,28 @@ class ChatApp {
     }
 
     async sendMessage() {
+        // VERROU pour empêcher les appels simultanés
+        if (this.isSendingMessage) {
+            return;
+        }
+        this.isSendingMessage = true;
+        
+        // Désactiver le bouton d'envoi pour éviter les double-clics
+        const submitBtn = document.querySelector('#message-form button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Envoi...';
+        }
+        
         const messageInput = document.getElementById('message-input');
         const message = messageInput.value.trim();
 
         if (!message) {
+            this.isSendingMessage = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Envoyer';
+            }
             return;
         }
 
@@ -483,7 +505,7 @@ class ChatApp {
                     }
                 }
                 
-                // Recharger immédiatement les messages pour voir le nouveau message
+                // Recharger immédiatement les messages (le verrou empêche les doublons)
                 this.loadMessages();
             } else {
                 // Vérifier si la limite est atteinte
@@ -510,6 +532,16 @@ class ChatApp {
         } catch (error) {
             console.error('Erreur lors de l\'envoi du message:', error);
             this.showNotification('Erreur lors de l\'envoi', 'error');
+        } finally {
+            // Déverrouiller à la fin
+            this.isSendingMessage = false;
+            
+            // Réactiver le bouton d'envoi
+            const submitBtn = document.querySelector('#message-form button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Envoyer';
+            }
         }
     }
 
@@ -530,6 +562,14 @@ class ChatApp {
             this.showLogin();
             return;
         }
+        
+        // Éviter les appels simultanés qui créent des doublons
+        if (this.isLoadingMessages) {
+            console.log('⏳ loadMessages déjà en cours, appel ignoré');
+            return;
+        }
+        
+        this.isLoadingMessages = true;
         
         try {
             this.updateConnectionStatus('🟡'); // Statut: en cours de chargement
@@ -577,6 +617,9 @@ class ChatApp {
             if (error.message && (error.message.includes('authentifié') || error.message.includes('session'))) {
                 this.handleSessionExpired();
             }
+        } finally {
+            // Toujours libérer le verrou
+            this.isLoadingMessages = false;
         }
     }
 
@@ -1065,7 +1108,9 @@ class ChatApp {
 
 // Initialisation de l'application
 document.addEventListener('DOMContentLoaded', () => {
-    window.chatApp = new ChatApp();
+    if (!window.chatApp) {
+        window.chatApp = new ChatApp();
+    }
 });
 
 // Gestion des raccourcis clavier

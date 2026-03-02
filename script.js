@@ -105,7 +105,7 @@ class ChatApp {
             this.showAuthMode('register');
         });
         
-        document.getElementById('show-login-from-register').addEventListener('click', (e) => {
+        document.getElementById('show-login_from_register').addEventListener('click', (e) => {
             e.preventDefault();
             this.showAuthMode('login');
         });
@@ -115,7 +115,7 @@ class ChatApp {
             this.showAuthMode('guest');
         });
         
-        document.getElementById('back-to-guest-from-register').addEventListener('click', (e) => {
+        document.getElementById('back-to-guest-from_register').addEventListener('click', (e) => {
             e.preventDefault();
             this.showAuthMode('guest');
         });
@@ -1004,7 +1004,10 @@ class ChatApp {
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
-        return div.innerHTML;
+        let html = div.innerHTML;
+        // Remplacer tous les codes d'apostrophe par '
+        html = html.replace(/&#39;|&#039;/g, "'");
+        return html;
     }
 
     showGuestWarning() {

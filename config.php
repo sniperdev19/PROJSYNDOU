@@ -4,7 +4,7 @@
 return [
     // Base de données MySQL
     'database' => [
-        'host' => 'localhost',
+        'host' =>'localhost',
         'dbname' => 'chat_app',
         'username' => 'root',
         'password' => '',
